@@ -163,3 +163,4 @@ export function renderTenantSuspendedHtml(hostname: string, tenantName?: string)
 </body>
 </html>`;
 }
+
