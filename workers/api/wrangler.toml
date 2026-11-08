@@ -1,0 +1,13 @@
+name = "shopnest-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+
+# Encrypted credentials KV store for gateway & service account keys
+[[kv_namespaces]]
+binding = "SECRETS_KV"
+id = "shopnest_secrets_kv"
+

@@ -1,0 +1,168 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================
+    // HELPER FUNCTIONS & AUTHENTICATION CLAIMS
+    // ========================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.role == 'superadmin';
+    }
+
+    function isSupportStaff() {
+      return isSignedIn() && (request.auth.token.role == 'superadmin' || request.auth.token.role == 'support');
+    }
+
+    function isTenantUser(tenantId) {
+      return isSignedIn() && request.auth.token.tenantId == tenantId;
+    }
+
+    function isTenantOwner(tenantId) {
+      return isTenantUser(tenantId) && request.auth.token.role == 'owner';
+    }
+
+    function isTenantManager(tenantId) {
+      return isTenantUser(tenantId) && (request.auth.token.role == 'owner' || request.auth.token.role == 'manager');
+    }
+
+    function isTenantStaff(tenantId) {
+      return isTenantUser(tenantId) && (
+        request.auth.token.role == 'owner' ||
+        request.auth.token.role == 'manager' ||
+        request.auth.token.role == 'staff'
+      );
+    }
+
+    // ========================================================
+    // PLATFORM MASTER COLLECTIONS (Platform Registry)
+    // ========================================================
+
+    // Platform Tenants Registry
+    match /tenants/{tenantId} {
+      // SuperAdmin has full access.
+      // Tenant owner can read and update limited details of their own tenant profile.
+      allow read: if isSuperAdmin() || (isSignedIn() && request.auth.token.tenantId == tenantId);
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isTenantOwner(tenantId) && 
+        // Tenant owner cannot alter planMode, firebaseMode, status, or features directly
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['planMode', 'firebaseMode', 'status', 'features', 'saasPlanId']));
+      allow delete: if isSuperAdmin();
+
+      // Sensitive Encrypted Credentials (Worker secrets/gateway keys)
+      match /encryptedCredentials/{docId} {
+        allow read, write: if isSuperAdmin();
+      }
+
+      // ========================================================
+      // TENANT-ISOLATED SUBCOLLECTIONS (Shared Firebase Project Mode)
+      // ========================================================
+
+      // 1. Products
+      match /products/{productId} {
+        // Public can read published products. Staff/Admin can read all.
+        allow read: if (resource.data.status == 'published') || isTenantStaff(tenantId) || isSuperAdmin();
+        // Managers and Owners can create, update, delete products.
+        allow create, update, delete: if isTenantManager(tenantId) || isSuperAdmin();
+      }
+
+      // 2. Categories
+      match /categories/{categoryId} {
+        // Public can read active categories.
+        allow read: if resource.data.isActive == true || isTenantStaff(tenantId) || isSuperAdmin();
+        allow create, update, delete: if isTenantManager(tenantId) || isSuperAdmin();
+      }
+
+      // 3. Orders
+      match /orders/{orderId} {
+        // Anyone can create an order (public storefront checkout)
+        // Must contain valid initial status ('pending') and matching tenantId
+        allow create: if request.resource.data.tenantId == tenantId &&
+                         request.resource.data.status in ['pending', 'processing'];
+        // Store staff and superadmins can read all orders for their tenant
+        // Customers can read only their own orders if authenticated
+        allow read: if isTenantStaff(tenantId) || isSuperAdmin() || 
+                       (isSignedIn() && resource.data.customerUid == request.auth.uid);
+        // Only staff/managers can update order status or details
+        allow update: if isTenantStaff(tenantId) || isSuperAdmin();
+        // Deletion reserved for Owner or SuperAdmin
+        allow delete: if isTenantOwner(tenantId) || isSuperAdmin();
+      }
+
+      // 4. Customers
+      match /customers/{customerId} {
+        allow read: if isTenantStaff(tenantId) || isSuperAdmin() || 
+                       (isSignedIn() && request.auth.uid == customerId);
+        allow create, update: if isTenantStaff(tenantId) || isSuperAdmin() || 
+                                 (isSignedIn() && request.auth.uid == customerId);
+        allow delete: if isTenantOwner(tenantId) || isSuperAdmin();
+      }
+
+      // 5. Inventory Logs
+      match /inventoryLogs/{logId} {
+        allow read: if isTenantStaff(tenantId) || isSuperAdmin();
+        allow create: if isTenantStaff(tenantId) || isSuperAdmin();
+        allow update, delete: if false; // Inventory logs are immutable audit records
+      }
+
+      // 6. Settings (General, Theme, Payment, Shipping, SEO)
+      match /settings/{settingDoc} {
+        // Public settings (general, theme, shipping, seo) readable by anyone for storefront rendering
+        allow read: if settingDoc in ['general', 'theme', 'shipping', 'seo'] || isTenantStaff(tenantId) || isSuperAdmin();
+        // Payment and private settings require staff
+        // Updates to settings require owner or manager
+        allow write: if isTenantManager(tenantId) || isSuperAdmin();
+      }
+
+      // 7. Staff Users & Roles
+      match /users/{userId} {
+        allow read: if isTenantStaff(tenantId) || isSuperAdmin();
+        // Only Tenant Owner or Super Admin can assign/modify staff accounts
+        allow write: if isTenantOwner(tenantId) || isSuperAdmin();
+      }
+
+      // 8. Aggregate Counters
+      match /counters/{counterId} {
+        allow read: if isTenantStaff(tenantId) || isSuperAdmin();
+        allow write: if isTenantStaff(tenantId) || isSuperAdmin();
+      }
+    }
+
+    // Platform Domains Registry
+    match /domains/{hostname} {
+      allow read: if true; // Public DNS resolver/Edge router needs to query domain record
+      allow write: if isSuperAdmin();
+    }
+
+    // SaaS Plans
+    match /saasPlans/{planId} {
+      allow read: if true; // Publicly visible for pricing page
+      allow write: if isSuperAdmin();
+    }
+
+    // Audit Logs (Immutable)
+    match /auditLogs/{logId} {
+      allow read: if isSuperAdmin() || isSupportStaff();
+      allow create: if isSignedIn(); // Log writer
+      allow update, delete: if false; // Immutable!
+    }
+
+    // Backup Configurations & Records
+    match /backupConfigs/{tenantId} {
+      allow read: if isSuperAdmin() || isTenantOwner(tenantId);
+      allow write: if isSuperAdmin();
+    }
+
+    match /backupRecords/{recordId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && request.auth.token.tenantId == resource.data.tenantId);
+      allow create, update: if isSuperAdmin(); // Managed by Backup Worker with service account / superadmin
+      allow delete: if isSuperAdmin();
+    }
+  }
+}
+

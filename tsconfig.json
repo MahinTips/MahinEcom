@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@shopnest/shared": ["packages/shared/src/index.ts"],
+      "@shopnest/shared/*": ["packages/shared/src/*"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "apps/*/src/**/*",
+    "workers/*/src/**/*",
+    "scripts/**/*"
+  ],
+  "exclude": ["node_modules", "dist", ".astro", ".wrangler"]
+}
+

@@ -1,0 +1,28 @@
+{
+  "name": "shopnest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise-Grade Multi-Tenant E-Commerce SaaS (ShopNest)",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers/*"
+  ],
+  "scripts": {
+    "build": "npm run --workspaces --if-present build",
+    "test": "npm --workspace=@shopnest/shared run test",
+    "test:all": "npm run --workspaces --if-present test",
+    "test:rules": "npm --workspace=@shopnest/shared run test:rules",
+    "lint": "npm run --workspaces --if-present lint",
+    "emulators:start": "firebase emulators:start --only firestore,auth",
+    "seed": "npx tsx scripts/run-seed.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

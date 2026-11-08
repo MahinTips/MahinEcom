@@ -1,0 +1,15 @@
+name = "shopnest-edge-router"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV Namespace for Fast Domain -> Tenant Resolution
+[[kv_namespaces]]
+binding = "DOMAINS_KV"
+id = "shopnest_domains_kv"
+
+[vars]
+PLATFORM_DOMAIN = "shopnest.com"
+ADMIN_SUBDOMAIN = "admin.shopnest.com"
+SUPER_ADMIN_SUBDOMAIN = "super.shopnest.com"
+
