@@ -6,4 +6,5 @@ export * from './data-adapter/QuotaTracker.js';
 export * from './data-adapter/MockDataAdapter.js';
 export * from './data-adapter/FirestoreRestAdapter.js';
 export * from './data-adapter/factory.js';
+export * from './services/CloudflareSaaSService.js';
 
