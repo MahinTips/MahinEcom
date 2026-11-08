@@ -111,11 +111,13 @@ export class MockDataAdapter implements IDataAdapter {
     if (queryDef?.orderBy && queryDef.orderBy.length > 0) {
       items.sort((a, b) => {
         for (const order of queryDef.orderBy!) {
-          const valA = a[order.field];
-          const valB = b[order.field];
+          const valA = a[order.field] as string | number | undefined;
+          const valB = b[order.field] as string | number | undefined;
           const dir = order.direction === 'desc' ? -1 : 1;
-          if (valA < valB) return -1 * dir;
-          if (valA > valB) return 1 * dir;
+          if (valA !== undefined && valB !== undefined) {
+            if (valA < valB) return -1 * dir;
+            if (valA > valB) return 1 * dir;
+          }
         }
         return 0;
       });

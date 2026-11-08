@@ -2,6 +2,7 @@
   "name": "shopnest",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Enterprise-Grade Multi-Tenant E-Commerce SaaS (ShopNest)",
   "workspaces": [
     "apps/*",
@@ -9,7 +10,8 @@
     "workers/*"
   ],
   "scripts": {
-    "build": "npm run --workspaces --if-present build",
+    "build": "npm run --workspace=@shopnest/shared build && npm run --workspace=@shopnest/ui build && node scripts/build-pages.js",
+    "build:all": "npm run --workspaces --if-present build",
     "test": "npm --workspace=@shopnest/shared run test",
     "test:all": "npm run --workspaces --if-present test",
     "test:rules": "npm --workspace=@shopnest/shared run test:rules",
